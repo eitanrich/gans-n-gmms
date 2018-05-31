@@ -1,2 +1,5 @@
 # gans-n-gmms
-Official implementation for On Gans and GMMs paper
+Official implementation of the NDB evaluation method for generative models and of the MFA model per "On GANs and GMMs"
+
+TODO:
+- [] Code cleanup and publish
