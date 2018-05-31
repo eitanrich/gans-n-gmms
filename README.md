@@ -1,5 +1,5 @@
-# gans-n-gmms
-Official implementation of the NDB evaluation method for generative models and of the MFA model per "On GANs and GMMs"
+# On GANs and GMMs
+Official implementation of the NDB evaluation method for generative models and of the MFA model.
 
 TODO:
-- [] Code cleanup and publish
+- [ ] Code cleanup and publish
