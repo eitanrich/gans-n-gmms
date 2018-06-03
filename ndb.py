@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import norm
+from matplotlib import pyplot as plt
 
 class NDB:
     def __init__(self, training_data=None, number_of_bins=100, whitening=False, max_dims=None):
@@ -13,6 +14,7 @@ class NDB:
         self.bin_centers = None
         self.bin_proportions = None
         self.ref_sample_size = None
+        self.cached_results = {}
         if training_data is not None:
             self.construct_bins(training_data)
 
@@ -58,18 +60,37 @@ class NDB:
         :return: results dictionary containing NDB and JS scores and array of labels (assigned bin for each query sample)
         """
         query_bin_proportions = self.__calculate_bin_proportions(query_samples)
-        print(query_bin_proportions)
-        ndb = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size, query_bin_proportions,
-                                         query_samples.shape[0])
+        # print(query_bin_proportions)
+        ndb = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size,
+                                         query_bin_proportions, query_samples.shape[0])
         js = NDB.jensen_shannon_divergence(self.bin_proportions, query_bin_proportions)
+        if model_label:
+            print('Results for {} samples from {}: '.format(query_samples.shape[0], model_label), end='')
+            self.cached_results[model_label] = {'NDB': ndb, 'JS': js, 'Proportions': query_bin_proportions}
         print('NDB =', ndb, ', JS =', js)
 
-    def plot_histograms(self, models_to_plot=None):
+
+    def plot_results(self, models_to_plot=None):
         """
-        Plot a histogram comparing the binning proportions of different methods
+        Plot the binning proportions of different methods
         :param models_to_plot: optional list of model labels to plot
         """
-        pass
+        K = self.number_of_bins
+        w = 1.0 / (len(self.cached_results) + 2)
+        assert K == self.bin_proportions.size
+        assert self.cached_results
+
+        plt.bar(np.arange(0, K), self.bin_proportions, width=w, label='Train')
+        if not models_to_plot:
+            models_to_plot = sorted(list(self.cached_results.keys()))
+        for i, model in enumerate(models_to_plot):
+            results = self.cached_results[model]
+            label = '%s (%i : %.4f)' % (model, results['NDB'], results['JS'])
+            plt.bar(np.arange(0, K)+(i+1)*w, results['Proportions'], width=w, label=label)
+        plt.legend(loc='best')
+        plt.grid(True)
+        plt.title('Binning Proportions Evaluation Results (NDB : JS)')
+        plt.show()
 
     def __calculate_bin_proportions(self, samples):
         if self.bin_centers is None:
@@ -121,9 +142,13 @@ class NDB:
 
 
 if __name__ == "__main__":
-    training_samples = np.random.uniform(size=[2000, 100])
-    ndb = NDB(training_data=training_samples, number_of_bins=10)
+    training_samples = np.random.uniform(size=[10000, 100])
+    ndb = NDB(training_data=training_samples, number_of_bins=100)
 
-    test_samples = np.random.uniform(high=0.9, size=[1000, 100])
-    ndb.calculate_score(test_samples)
+    test_samples = np.random.uniform(high=0.95, size=[2000, 100])
+    ndb.calculate_score(test_samples, model_label='Foo')
 
+    test_samples = np.random.uniform(high=0.8, size=[2000, 100])
+    ndb.calculate_score(test_samples, model_label='Baa')
+
+    ndb.plot_results(models_to_plot=['Baa'])
