@@ -59,16 +59,16 @@ class NDB:
         :param model_label: optional label string for the evaluated model, allows plotting results of multiple models
         :return: results dictionary containing NDB and JS scores and array of labels (assigned bin for each query sample)
         """
+        n = query_samples.shape[0]
         query_bin_proportions = self.__calculate_bin_proportions(query_samples)
         # print(query_bin_proportions)
         ndb = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size,
-                                         query_bin_proportions, query_samples.shape[0])
+                                         query_bin_proportions, n)
         js = NDB.jensen_shannon_divergence(self.bin_proportions, query_bin_proportions)
         if model_label:
-            print('Results for {} samples from {}: '.format(query_samples.shape[0], model_label), end='')
-            self.cached_results[model_label] = {'NDB': ndb, 'JS': js, 'Proportions': query_bin_proportions}
+            print('Results for {} samples from {}: '.format(n, model_label), end='')
+            self.cached_results[model_label] = {'NDB': ndb, 'JS': js, 'Proportions': query_bin_proportions, 'N': n}
         print('NDB =', ndb, ', JS =', js)
-
 
     def plot_results(self, models_to_plot=None):
         """
@@ -76,17 +76,28 @@ class NDB:
         :param models_to_plot: optional list of model labels to plot
         """
         K = self.number_of_bins
-        w = 1.0 / (len(self.cached_results) + 2)
+        w = 1.0 / (len(self.cached_results)+1)
         assert K == self.bin_proportions.size
         assert self.cached_results
 
-        plt.bar(np.arange(0, K), self.bin_proportions, width=w, label='Train')
+        # Used for plotting only
+        def calc_se(p1, n1, p2, n2):
+            p = (p1 * n1 + p2 * n2) / (n1 + n2)
+            return np.sqrt(p * (1 - p) * (1/n1 + 1/n2))
+
         if not models_to_plot:
             models_to_plot = sorted(list(self.cached_results.keys()))
+
+        train_se = calc_se(self.bin_proportions, self.ref_sample_size,
+                                        self.bin_proportions, self.cached_results[models_to_plot[0]]['N'])
+        plt.bar(np.arange(0, K)+0.5, height=train_se*2.0, bottom=self.bin_proportions-train_se,
+                width=1.0, label='Train', color='gray')
+
         for i, model in enumerate(models_to_plot):
             results = self.cached_results[model]
             label = '%s (%i : %.4f)' % (model, results['NDB'], results['JS'])
-            plt.bar(np.arange(0, K)+(i+1)*w, results['Proportions'], width=w, label=label)
+            print(model, i, (i+0.25)*w, w)
+            plt.bar(np.arange(0, K)+(i+1.0)*w, results['Proportions'], width=w, label=label)
         plt.legend(loc='best')
         plt.grid(True)
         plt.title('Binning Proportions Evaluation Results (NDB : JS)')
@@ -142,13 +153,21 @@ class NDB:
 
 
 if __name__ == "__main__":
-    training_samples = np.random.uniform(size=[10000, 100])
-    ndb = NDB(training_data=training_samples, number_of_bins=100)
+    d=100
+    k=50
+    n_train = k*100
+    n_test = k*10
 
-    test_samples = np.random.uniform(high=0.95, size=[2000, 100])
-    ndb.calculate_score(test_samples, model_label='Foo')
+    training_samples = np.random.uniform(size=[n_train, d])
+    ndb = NDB(training_data=training_samples, number_of_bins=k)
 
-    test_samples = np.random.uniform(high=0.8, size=[2000, 100])
-    ndb.calculate_score(test_samples, model_label='Baa')
+    test_samples = np.random.uniform(high=1.0, size=[n_test, d])
+    ndb.calculate_score(test_samples, model_label='Test')
 
-    ndb.plot_results(models_to_plot=['Baa'])
+    test_samples = np.random.uniform(high=0.9, size=[n_test, d])
+    ndb.calculate_score(test_samples, model_label='Good')
+
+    test_samples = np.random.uniform(high=0.75, size=[n_test, d])
+    ndb.calculate_score(test_samples, model_label='Bad')
+
+    ndb.plot_results(models_to_plot=['Test', 'Good', 'Bad'])
