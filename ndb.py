@@ -1,11 +1,20 @@
+import os
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import norm
 from matplotlib import pyplot as plt
-
+import pickle as pkl
 
 class NDB:
-    def __init__(self, training_data=None, number_of_bins=100, whitening=False, max_dims=None):
+    def __init__(self, training_data=None, number_of_bins=100, whitening=False, max_dims=None, bins_file=None):
+        """
+        NDB Evaluation Class
+        :param training_data: Optional - the training samples - array of m x d floats (m samples of dimension d)
+        :param number_of_bins: Number of bins (clusters) default=100
+        :param whitening: Perform data whitening - subtract mean and divide by per-dimension std
+        :param max_dims: Max dimensions to use in K-means. By default derived automatically from d
+        :param bins_file: Optional - file to write / read-from the clusters (to avoid re-calculation)
+        """
         self.number_of_bins = number_of_bins
         self.whitening = whitening
         self.ndb_eps = 1e-6
@@ -17,14 +26,18 @@ class NDB:
         self.ref_sample_size = None
         self.cached_results = {}
         if training_data is not None:
-            self.construct_bins(training_data)
+            self.construct_bins(training_data, bins_file)
 
-    def construct_bins(self, training_samples):
+    def construct_bins(self, training_samples, bins_file):
         """
         Performs K-means clustering of the training samples
         :param training_samples: An array of m x d floats (m samples of dimension d)
         """
+
+        if self.__read_from_bins_file(bins_file):
+            return
         n, d = training_samples.shape
+        k = self.number_of_bins
         if self.whitening:
             self.training_mean = np.mean(training_samples, axis=0)
             self.training_std = np.std(training_samples, axis=0) + self.ndb_eps
@@ -37,11 +50,15 @@ class NDB:
         d_used = d if self.max_dims is None else min(d, self.max_dims)
         d_indices = np.random.permutation(d)
 
-        print('Performing K-Means clustering of {} samples in dimension {} / {} ...'.format(n, d_used, d))
-        clusters = KMeans(n_clusters=self.number_of_bins, max_iter=100, n_jobs=-1).fit(whitened_samples[:, d_indices[:d_used]])
+        print('Performing K-Means clustering of {} samples in dimension {} / {} to {} clusters ...'.format(n, d_used, d, k))
+        print('Can take a couple of minutes...')
+        if n//k > 1000:
+            print('Training data size should be ~500 times the number of bins (for reasonable speed and accuracy)')
 
-        bin_centers = np.zeros([self.number_of_bins, d])
-        for i in range(self.number_of_bins):
+        clusters = KMeans(n_clusters=k, max_iter=100, n_jobs=-1).fit(whitened_samples[:, d_indices[:d_used]])
+
+        bin_centers = np.zeros([k, d])
+        for i in range(k):
             bin_centers[i, :] = np.mean(whitened_samples[clusters.labels_ == i, :], axis=0)
 
         # Organize bins by size
@@ -50,9 +67,10 @@ class NDB:
         self.bin_proportions = label_counts[bin_order] / np.sum(label_counts)
         self.bin_centers = bin_centers[bin_order, :]
         self.ref_sample_size = n
+        self.__write_to_bins_file(bins_file)
         print('Done.')
 
-    def calculate_score(self, query_samples, model_label=None):
+    def evaluate(self, query_samples, model_label=None):
         """
         Assign each sample to the nearest bin center (in L2). Pre-whiten if required. and calculate the NDB
         (Number of statistically Different Bins) and JS divergence scores.
@@ -107,7 +125,7 @@ class NDB:
         plt.legend(loc='best')
         plt.ylim((0.0, min(ymax, np.max(self.bin_proportions)*4.0)))
         plt.grid(True)
-        plt.title('Binning Proportions Evaluation Results (NDB : JS)')
+        plt.title('Binning Proportions Evaluation Results for {} bins (NDB : JS)'.format(K))
         plt.show()
 
     def __calculate_bin_proportions(self, samples):
@@ -125,6 +143,28 @@ class NDB:
         label_vals, label_counts = np.unique(labels, return_counts=True)
         probs[label_vals] = label_counts / n
         return probs
+
+    def __read_from_bins_file(self, bins_file):
+        if bins_file and os.path.isfile(bins_file):
+            print('Loading binning results from', bins_file)
+            bins_data = pkl.load(open(bins_file,'rb'))
+            self.bin_proportions = bins_data['proportions']
+            self.bin_centers = bins_data['centers']
+            self.ref_sample_size = bins_data['n']
+            self.training_mean = bins_data['mean']
+            self.training_std = bins_data['std']
+            return True
+        return False
+
+    def __write_to_bins_file(self, bins_file):
+        if bins_file:
+            print('Caching binning results to', bins_file)
+            bins_data = {'proportions': self.bin_proportions,
+                         'centers': self.bin_centers,
+                         'n': self.ref_sample_size,
+                         'mean': self.training_mean,
+                         'std': self.training_std}
+            pkl.dump(bins_data, open(bins_file, 'wb'))
 
     @staticmethod
     def two_proportions_z_test(p1, n1, p2, n2, significance_level=0.05):
@@ -168,12 +208,12 @@ if __name__ == "__main__":
     ndb = NDB(training_data=train_samples, number_of_bins=k, whitening=True)
 
     test_samples = np.random.uniform(high=1.0, size=[n_test, dim])
-    ndb.calculate_score(test_samples, model_label='Test')
+    ndb.evaluate(test_samples, model_label='Test')
 
     test_samples = np.random.uniform(high=0.9, size=[n_test, dim])
-    ndb.calculate_score(test_samples, model_label='Good')
+    ndb.evaluate(test_samples, model_label='Good')
 
     test_samples = np.random.uniform(high=0.75, size=[n_test, dim])
-    ndb.calculate_score(test_samples, model_label='Bad')
+    ndb.evaluate(test_samples, model_label='Bad')
 
     ndb.plot_results(models_to_plot=['Test', 'Good', 'Bad'])
