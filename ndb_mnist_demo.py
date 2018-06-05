@@ -29,6 +29,13 @@ def load_mnist_data(dataset_folder):
     test_labels = load_labels(os.path.join(dataset_folder, 't10k-labels.idx1-ubyte'))
     return train_samples, train_labels, test_samples, test_labels
 
+
+def sample_from(samples, number_to_use):
+    assert samples.shape[0] >= number_to_use
+    rand_order = np.random.permutation(samples.shape[0])
+    return samples[rand_order[:number_to_use], :]
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_folder', help='folder containing the MNIST dataset', default='./data/mnist')
@@ -39,30 +46,28 @@ def parse_args(argv):
 def main(argv):
     args = parse_args(argv)
     train_val_samples, _, test_samples, test_labels = load_mnist_data(args.dataset_folder)
-    n_val = train_val_samples.shape[0]//6
+    n_test = 7500
+    n_val = n_test
     n_train = train_val_samples.shape[0] - n_val
-    n_test = test_samples.shape[0]
-    print('Dividing MNIST data to {}/{} (train/val) and {} (test)'.format(n_train, n_val, n_test))
-    # Evaluate a small random batch from the training set - should be very similar to the reference bins
-    # rand_order = np.random.permutation(train_val_samples.shape[0])
-    # train_samples = train_val_samples[rand_order[:n_train]]
-    # val_samples = train_val_samples[rand_order[n_train:]]
-    train_samples = train_val_samples[:n_train]
-    val_samples = train_val_samples[n_train:]
 
-    # Initialize the NDB bins with the training samples
-    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, whitening=False,
-                    bins_file='mnist_{}.pkl'.format(args.num_bins))
+    print('Splitting MNIST training data to random train/val ({}/{}).'.format(n_train, n_val))
+    rand_order = np.random.permutation(train_val_samples.shape[0])
+    train_samples = train_val_samples[rand_order[:n_train]]
+    val_samples = train_val_samples[rand_order[n_train:]]
 
-    # Evaluate the validation samples (randomly split from the train samples - should be very similar)
-    mnist_ndb.evaluate(val_samples, 'Validation')
+    print('Initialize NDB bins with training samples')
+    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, whitening=False)
+                    # bins_file='mnist_{}.pkl'.format(args.num_bins))
 
-    # Evaluate the Test set (different writers - can be somewhat different)
-    mnist_ndb.evaluate(test_samples, 'Test')
+    print('Evaluating {} validation samples (randomly split from the train samples - should be very similar)'.format(n_val))
+    mnist_ndb.evaluate(sample_from(val_samples, n_val), 'Validation')
 
-    # Simulate a deviation from the data distribution (mode collapse) by sampling from specific labels (digits)
-    mnist_ndb.evaluate(test_samples[test_labels < 9, :], 'Test0-8')
-    mnist_ndb.evaluate(test_samples[test_labels < 8, :], 'Test0-7')
+    print('Evaluating {} test samples (different writers - can be somewhat different)'.format(n_test))
+    mnist_ndb.evaluate(sample_from(test_samples, n_test), 'Test')
+
+    print('Simulate a deviation from the data distribution (mode collapse) by sampling from specific labels (digits)')
+    mnist_ndb.evaluate(sample_from(test_samples[test_labels < 9, :], n_test), 'Test0-8')
+    mnist_ndb.evaluate(sample_from(test_samples[test_labels < 8, :], n_test), 'Test0-7')
 
     mnist_ndb.plot_results()
 
