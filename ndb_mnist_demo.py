@@ -32,7 +32,7 @@ def load_mnist_data(dataset_folder):
 def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_folder', help='folder containing the MNIST dataset', default='./data/mnist')
-    parser.add_argument('--num_bins', default=100)
+    parser.add_argument('--num_bins', default=50)
     return parser.parse_args()
 
 
@@ -44,9 +44,11 @@ def main(argv):
     n_test = test_samples.shape[0]
     print('Dividing MNIST data to {}/{} (train/val) and {} (test)'.format(n_train, n_val, n_test))
     # Evaluate a small random batch from the training set - should be very similar to the reference bins
-    rand_order = np.random.permutation(train_val_samples.shape[0])
-    train_samples = train_val_samples[rand_order[:n_train]]
-    val_samples = train_val_samples[rand_order[n_train:]]
+    # rand_order = np.random.permutation(train_val_samples.shape[0])
+    # train_samples = train_val_samples[rand_order[:n_train]]
+    # val_samples = train_val_samples[rand_order[n_train:]]
+    train_samples = train_val_samples[:n_train]
+    val_samples = train_val_samples[n_train:]
 
     # Initialize the NDB bins with the training samples
     mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, whitening=False,
