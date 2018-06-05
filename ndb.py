@@ -6,16 +6,19 @@ from matplotlib import pyplot as plt
 import pickle as pkl
 
 class NDB:
-    def __init__(self, training_data=None, number_of_bins=100, whitening=False, max_dims=None, bins_file=None):
+    def __init__(self, training_data=None, number_of_bins=100, significance_level=0.05,
+                 whitening=False, max_dims=None, bins_file=None):
         """
         NDB Evaluation Class
         :param training_data: Optional - the training samples - array of m x d floats (m samples of dimension d)
         :param number_of_bins: Number of bins (clusters) default=100
+        :param significance_level: The statistical significance level for the two-sample test
         :param whitening: Perform data whitening - subtract mean and divide by per-dimension std
         :param max_dims: Max dimensions to use in K-means. By default derived automatically from d
         :param bins_file: Optional - file to write / read-from the clusters (to avoid re-calculation)
         """
         self.number_of_bins = number_of_bins
+        self.significance_level = significance_level
         self.whitening = whitening
         self.ndb_eps = 1e-6
         self.training_mean = 0.0
@@ -79,15 +82,24 @@ class NDB:
         :return: results dictionary containing NDB and JS scores and array of labels (assigned bin for each query sample)
         """
         n = query_samples.shape[0]
-        query_bin_proportions = self.__calculate_bin_proportions(query_samples)
+        query_bin_proportions, query_bin_assignments = self.__calculate_bin_proportions(query_samples)
         # print(query_bin_proportions)
-        ndb = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size,
-                                         query_bin_proportions, n)
+        different_bins = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size, query_bin_proportions,
+                                                    n, significance_level=self.significance_level)
+        ndb = np.count_nonzero(different_bins)
         js = NDB.jensen_shannon_divergence(self.bin_proportions, query_bin_proportions)
+        results = {'NDB': ndb,
+                   'JS': js,
+                   'Proportions': query_bin_proportions,
+                   'N': n,
+                   'Bin-Assignment': query_bin_assignments,
+                   'Different-Bins': different_bins}
+
         if model_label:
             print('Results for {} samples from {}: '.format(n, model_label), end='')
-            self.cached_results[model_label] = {'NDB': ndb, 'JS': js, 'Proportions': query_bin_proportions, 'N': n}
+            self.cached_results[model_label] = results
         print('NDB =', ndb, ', JS =', js)
+        return results
 
     def plot_results(self, models_to_plot=None):
         """
@@ -142,7 +154,7 @@ class NDB:
         probs = np.zeros([k])
         label_vals, label_counts = np.unique(labels, return_counts=True)
         probs[label_vals] = label_counts / n
-        return probs
+        return probs, labels
 
     def __read_from_bins_file(self, bins_file):
         if bins_file and os.path.isfile(bins_file):
@@ -167,14 +179,14 @@ class NDB:
             pkl.dump(bins_data, open(bins_file, 'wb'))
 
     @staticmethod
-    def two_proportions_z_test(p1, n1, p2, n2, significance_level=0.05):
+    def two_proportions_z_test(p1, n1, p2, n2, significance_level):
         # Per http://stattrek.com/hypothesis-test/difference-in-proportions.aspx
         # See also http://www.itl.nist.gov/div898/software/dataplot/refman1/auxillar/binotest.htm
         p = (p1 * n1 + p2 * n2) / (n1 + n2)
         se = np.sqrt(p * (1 - p) * (1/n1 + 1/n2))
         z = (p1 - p2) / se
         p_values = 2.0 * norm.cdf(-1.0 * np.abs(z))    # Two-tailed test
-        return np.count_nonzero(p_values < significance_level)
+        return p_values < significance_level
 
     @staticmethod
     def jensen_shannon_divergence(p, q):
