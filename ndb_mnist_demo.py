@@ -68,8 +68,8 @@ def main(argv):
     val_labels = train_val_labels[rand_order[n_train:]]
 
     print('Initialize NDB bins with training samples')
-    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, significance_level=0.01, whitening=False,
-                    bins_file='mnist_{}.pkl'.format(args.num_bins))
+    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, z_threshold=3, whitening=False)
+                    # bins_file='mnist_{}.pkl'.format(args.num_bins))
 
     print('Evaluating {} validation samples (randomly split from the train samples - should be very similar)'.format(n_query))
     mnist_ndb.evaluate(sample_from(val_samples, n_query), 'Validation')
@@ -81,6 +81,8 @@ def main(argv):
 
     # Visualize the missing bins
     visualize_bins(mnist_ndb.bin_centers, results['Different-Bins'])
+    # missing_bins = results['Proportions']/mnist_ndb.bin_proportions < 0.5
+    # visualize_bins(mnist_ndb.bin_centers, missing_bins)
     plt.savefig('bins_with_Val0-8_results_{}.png'.format(args.num_bins))
 
     print('Evaluating {} test-set samples (different writers - can be somewhat different)'.format(n_query))

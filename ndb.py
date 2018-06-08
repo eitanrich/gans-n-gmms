@@ -6,19 +6,21 @@ from matplotlib import pyplot as plt
 import pickle as pkl
 
 class NDB:
-    def __init__(self, training_data=None, number_of_bins=100, significance_level=0.05,
+    def __init__(self, training_data=None, number_of_bins=100, significance_level=0.05, z_threshold=None,
                  whitening=False, max_dims=None, bins_file=None):
         """
         NDB Evaluation Class
         :param training_data: Optional - the training samples - array of m x d floats (m samples of dimension d)
         :param number_of_bins: Number of bins (clusters) default=100
         :param significance_level: The statistical significance level for the two-sample test
+        :param z_threshold: Allow defining a threshold in terms of difference/SE for defining a bin as statistically different
         :param whitening: Perform data whitening - subtract mean and divide by per-dimension std
         :param max_dims: Max dimensions to use in K-means. By default derived automatically from d
         :param bins_file: Optional - file to write / read-from the clusters (to avoid re-calculation)
         """
         self.number_of_bins = number_of_bins
         self.significance_level = significance_level
+        self.z_threshold = z_threshold
         self.whitening = whitening
         self.ndb_eps = 1e-6
         self.training_mean = 0.0
@@ -85,7 +87,8 @@ class NDB:
         query_bin_proportions, query_bin_assignments = self.__calculate_bin_proportions(query_samples)
         # print(query_bin_proportions)
         different_bins = NDB.two_proportions_z_test(self.bin_proportions, self.ref_sample_size, query_bin_proportions,
-                                                    n, significance_level=self.significance_level)
+                                                    n, significance_level=self.significance_level,
+                                                    z_threshold=self.z_threshold)
         ndb = np.count_nonzero(different_bins)
         js = NDB.jensen_shannon_divergence(self.bin_proportions, query_bin_proportions)
         results = {'NDB': ndb,
@@ -123,7 +126,7 @@ class NDB:
         train_se = calc_se(self.bin_proportions, self.ref_sample_size,
                            self.bin_proportions, self.cached_results[models_to_plot[0]]['N'])
         plt.bar(np.arange(0, K)+0.5, height=train_se*2.0, bottom=self.bin_proportions-train_se,
-                width=1.0, label='Train', color='gray')
+                width=1.0, label='Train$\pm$SE', color='gray')
 
         ymax = 0.0
         for i, model in enumerate(models_to_plot):
@@ -179,12 +182,15 @@ class NDB:
             pkl.dump(bins_data, open(bins_file, 'wb'))
 
     @staticmethod
-    def two_proportions_z_test(p1, n1, p2, n2, significance_level):
+    def two_proportions_z_test(p1, n1, p2, n2, significance_level, z_threshold=None):
         # Per http://stattrek.com/hypothesis-test/difference-in-proportions.aspx
         # See also http://www.itl.nist.gov/div898/software/dataplot/refman1/auxillar/binotest.htm
         p = (p1 * n1 + p2 * n2) / (n1 + n2)
         se = np.sqrt(p * (1 - p) * (1/n1 + 1/n2))
         z = (p1 - p2) / se
+        # Allow defining a threshold in terms as Z (difference relative to the SE) rather than in p-values.
+        if z_threshold is not None:
+            return abs(z) > z_threshold
         p_values = 2.0 * norm.cdf(-1.0 * np.abs(z))    # Two-tailed test
         return p_values < significance_level
 
