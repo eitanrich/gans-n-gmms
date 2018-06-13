@@ -24,7 +24,7 @@ Implementation of *NDB* and *MFA* per [On GANs and GMMs](https://arxiv.org/abs/1
 - Download and extract MNIST from http://yann.lecun.com/exdb/mnist/ to `./data/mnist` (should contain 4 `ubyte` files)
 - Run `python ndb_mnist_demo.py`:
 
-The resulting binning histogram and NDB (Number of statistically Different Bins) and JS (Jensen-Shannon Divergence) values:
+The resulting binning histogram, and NDB (Number of statistically Different Bins) and JS (Jensen-Shannon Divergence) values:
 <img src="images/mnist_histograms_100.png"/>
 
 NDB evaluation on this toy example reveals that:
@@ -32,7 +32,7 @@ NDB evaluation on this toy example reveals that:
 - The MNIST test set is not coming from exactly the same distribution (different writers), but is pretty close (NDB = 4, JS divergence = 0.0041)
 - NDB detects the distribution distortion in a deliberately biased set created by removing all digit 9 samples from the validation sets (NDB = 11, JS divergence = 0.016)
 
-A plot showing the NDB bin centers and the missing bins in the simulated Val0-8 evaluated set (all bins corresponding to digit 9):
+A plot showing the NDB bin centers and the statistically-different bins (with significance level = 3 standard-errors) in the simulated Val0-8 evaluated set (all bins corresponding to digit 9):
 <img src="images/bins_with_Val0-8_results_100.png"/>
 
-
+**The NDB test can be used to evaluate different generative models (e.g. GANs). In our paper, we demonstrate its performance on three datasets - CelebA, SVHN and MNIST.**
