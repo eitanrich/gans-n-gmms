@@ -7,7 +7,7 @@ import pickle as pkl
 
 class NDB:
     def __init__(self, training_data=None, number_of_bins=100, significance_level=0.05, z_threshold=None,
-                 whitening=False, max_dims=None, bins_file=None):
+                 whitening=False, max_dims=None, cache_folder=None):
         """
         NDB Evaluation Class
         :param training_data: Optional - the training samples - array of m x d floats (m samples of dimension d)
@@ -26,12 +26,25 @@ class NDB:
         self.training_mean = 0.0
         self.training_std = 1.0
         self.max_dims = max_dims
+        self.cache_folder = cache_folder
         self.bin_centers = None
         self.bin_proportions = None
         self.ref_sample_size = None
+        self.used_d_indices = None
+        self.results_file = None
+        self.test_name = 'ndb_{}_bins_{}'.format(self.number_of_bins, 'whiten' if self.whitening else 'orig')
         self.cached_results = {}
-        if training_data is not None:
-            self.construct_bins(training_data, bins_file)
+        if self.cache_folder:
+            self.results_file = os.path.join(cache_folder, self.test_name+'_results.pkl')
+            if os.path.isfile(self.results_file):
+                # print('Loading previous results from', self.results_file, ':')
+                self.cached_results = pkl.load(open(self.results_file, 'rb'))
+                # print(self.cached_results.keys())
+        if training_data is not None or cache_folder is not None:
+                bins_file = None
+                if cache_folder:
+                    bins_file = os.path.join(cache_folder, self.test_name+'.pkl')
+                self.construct_bins(training_data, bins_file)
 
     def construct_bins(self, training_samples, bins_file):
         """
@@ -53,14 +66,14 @@ class NDB:
 
         whitened_samples = (training_samples-self.training_mean)/self.training_std
         d_used = d if self.max_dims is None else min(d, self.max_dims)
-        d_indices = np.random.permutation(d)
+        self.used_d_indices = np.random.choice(d, d_used, replace=False)
 
         print('Performing K-Means clustering of {} samples in dimension {} / {} to {} clusters ...'.format(n, d_used, d, k))
         print('Can take a couple of minutes...')
         if n//k > 1000:
             print('Training data size should be ~500 times the number of bins (for reasonable speed and accuracy)')
 
-        clusters = KMeans(n_clusters=k, max_iter=100, n_jobs=-1).fit(whitened_samples[:, d_indices[:d_used]])
+        clusters = KMeans(n_clusters=k, max_iter=100, n_jobs=-1).fit(whitened_samples[:, self.used_d_indices])
 
         bin_centers = np.zeros([k, d])
         for i in range(k):
@@ -101,8 +114,18 @@ class NDB:
         if model_label:
             print('Results for {} samples from {}: '.format(n, model_label), end='')
             self.cached_results[model_label] = results
-        print('NDB =', ndb, ', JS =', js)
+            if self.results_file:
+                # print('Storing result to', self.results_file)
+                pkl.dump(self.cached_results, open(self.results_file, 'wb'))
+
+        print('NDB =', ndb, 'NDB/K =', ndb/self.number_of_bins, ', JS =', js)
         return results
+
+    def print_results(self):
+        print('NSB results (K={}{}):'.format(self.number_of_bins, ', data whitening' if self.whitening else ''))
+        for model in sorted(list(self.cached_results.keys())):
+            res = self.cached_results[model]
+            print('%s: NDB = %d, NDB/K = %.3f, JS = %.4f' % (model, res['NDB'], res['NDB']/self.number_of_bins, res['JS']))
 
     def plot_results(self, models_to_plot=None):
         """
@@ -147,12 +170,16 @@ class NDB:
         if self.bin_centers is None:
             print('First run construct_bins on samples from the reference training data')
         assert samples.shape[1] == self.bin_centers.shape[1]
-        n = samples.shape[0]
+        n, d = samples.shape
         k = self.bin_centers.shape[0]
         D = np.zeros([n, k], dtype=samples.dtype)
+
         whitened_samples = (samples-self.training_mean)/self.training_std
         for i in range(k):
-            D[:, i] = np.linalg.norm(whitened_samples - self.bin_centers[i, :], ord=2, axis=1)
+            print('.', end='', flush=True)
+            D[:, i] = np.linalg.norm(whitened_samples[:, self.used_d_indices] - self.bin_centers[i, self.used_d_indices],
+                                     ord=2, axis=1)
+        print()
         labels = np.argmin(D, axis=1)
         probs = np.zeros([k])
         label_vals, label_counts = np.unique(labels, return_counts=True)
@@ -168,6 +195,7 @@ class NDB:
             self.ref_sample_size = bins_data['n']
             self.training_mean = bins_data['mean']
             self.training_std = bins_data['std']
+            self.used_d_indices = bins_data['d_indices']
             return True
         return False
 
@@ -178,7 +206,8 @@ class NDB:
                          'centers': self.bin_centers,
                          'n': self.ref_sample_size,
                          'mean': self.training_mean,
-                         'std': self.training_std}
+                         'std': self.training_std,
+                         'd_indices': self.used_d_indices}
             pkl.dump(bins_data, open(bins_file, 'wb'))
 
     @staticmethod
