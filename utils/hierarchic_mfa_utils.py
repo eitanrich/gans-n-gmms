@@ -4,6 +4,7 @@ import sys
 from collections import defaultdict
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
 import mfa
+import mfa_tf
 import mfa_utils
 import image_batch_provider
 
@@ -13,12 +14,14 @@ def split_data_by_model_components(gmm_model, model_folder, image_provider, imag
 
     if whiten:
        dataset_mean, dataset_std = mfa_utils.get_dataset_mean_and_std(image_provider)
+    else:
+        dataset_mean, dataset_std = (0.0, 1.0)
 
     # Restore the TF model
-    G_PI, G_MU, G_A, G_D = mfa_utils.init_raw_parms_from_gmm_diag(gmm_model)
+    G_PI, G_MU, G_A, G_D = mfa_tf.init_raw_parms_from_gmm(gmm_model)
     Theta_G = (G_PI, G_MU, G_A, G_D)
     X = tf.placeholder(tf.float32, shape=[None, gmm_model.components[0]['A'].shape[0]])
-    C_X = mfa_utils.get_max_posterior_component_diag(X, *Theta_G)
+    C_X = mfa_tf.get_max_posterior_component(X, *Theta_G)
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())

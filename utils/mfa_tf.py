@@ -3,11 +3,12 @@ import sys
 import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import mfa
+import math
 import tensorflow as tf
 from tensorflow.contrib.framework import list_variables
 
 
-def init_raw_parms_np_diag(K, d, l):
+def init_raw_parms_np(K, d, l):
     N_PI = np.zeros([K], dtype=np.float32)          # The mixing coefficient logits
     N_MU = np.zeros([K, d], dtype=np.float32)       # Mean values
     N_A = np.zeros([K, d, l], dtype=np.float32)     # Scale - rectangular matrix
@@ -15,15 +16,15 @@ def init_raw_parms_np_diag(K, d, l):
     return N_PI, N_MU, N_A, N_D
 
 
-def init_raw_parms_diag(K, d, l):
-    N_PI, N_MU, N_A, N_D = init_raw_parms_np_diag(K, d, l)
+def init_raw_parms(K, d, l):
+    N_PI, N_MU, N_A, N_D = init_raw_parms_np(K, d, l)
     return tf.Variable(N_PI, name='PI'), tf.Variable(N_MU, name='MU'), tf.Variable(N_A, name='A'), tf.Variable(N_D, name='D')
 
 
-def init_raw_parms_from_gmm_diag(gmm, prefix=''):
+def init_raw_parms_from_gmm(gmm, prefix=''):
     K = len(gmm.components)
     d, l = gmm.components[0]['A'].shape
-    N_PI, N_MU, N_A, N_D = init_raw_parms_np_diag(K, d, l)
+    N_PI, N_MU, N_A, N_D = init_raw_parms_np(K, d, l)
     for i, c in gmm.components.items():
         N_PI[i] = np.log(c['pi'])
         N_MU[i, ...] = c['mu']
@@ -36,7 +37,7 @@ def init_raw_parms_from_gmm_diag(gmm, prefix=''):
            tf.Variable(N_D, name=prefix+'D')
 
 
-def raw_to_gmm_diag(PI, MU, A, D, raw_as_log=False):
+def raw_to_gmm(PI, MU, A, D, raw_as_log=False):
     K = np.size(PI)
     pi_vals = np.exp(PI) / np.sum(np.exp(PI))
     components = {}
@@ -48,7 +49,7 @@ def raw_to_gmm_diag(PI, MU, A, D, raw_as_log=False):
     return mfa.MFA(components)
 
 
-def get_per_components_log_likelihood_diag(X, PI_logits, MU, A, sqrt_D):
+def get_per_components_log_likelihood(X, PI_logits, MU, A, sqrt_D):
     """
     Calculate the data log likelihood for low-rank Gaussian Mixture Model.
     See "Learning a Low-rank GMM" (Eitan Richardson) for details
@@ -91,25 +92,25 @@ def get_per_components_log_likelihood_diag(X, PI_logits, MU, A, sqrt_D):
     return component_log_probs + log_prob_data_given_components
 
 
-def get_log_likelihood_diag(X, PI, MU, A, D):
-    comp_LLs = get_per_components_log_likelihood_diag(X, PI, MU, A, D)
+def get_log_likelihood(X, PI, MU, A, D):
+    comp_LLs = get_per_components_log_likelihood(X, PI, MU, A, D)
     LLs = tf.reduce_logsumexp(comp_LLs, axis=0)
     return tf.reduce_sum(LLs)
 
 
-def get_per_sample_log_likelihood_diag(X, PI, MU, A, D):
-    comp_LLs = get_per_components_log_likelihood_diag(X, PI, MU, A, D)
+def get_per_sample_log_likelihood(X, PI, MU, A, D):
+    comp_LLs = get_per_components_log_likelihood(X, PI, MU, A, D)
     LLs = tf.reduce_logsumexp(comp_LLs, axis=0)
     return LLs
 
 
-def get_per_sample_per_component_log_prob_diag(X, PI, MU, A, D):
-    comp_LLs = get_per_components_log_likelihood_diag(X, PI, MU, A, D)
+def get_per_sample_per_component_log_prob(X, PI, MU, A, D):
+    comp_LLs = get_per_components_log_likelihood(X, PI, MU, A, D)
     return comp_LLs
 
 
 def get_per_sample_log_responsibilities(X, PI, MU, A, D):
-    comp_LLs = get_per_components_log_likelihood_diag(X, PI, MU, A, D)
+    comp_LLs = get_per_components_log_likelihood(X, PI, MU, A, D)
     return comp_LLs - tf.reduce_logsumexp(comp_LLs, axis=0)
 
 
@@ -117,8 +118,8 @@ def get_per_sample_responsibilities(X, PI, MU, A, D):
     return tf.exp(get_per_sample_log_responsibilities(X, PI, MU, A, D))
 
 
-def get_max_posterior_component_diag(X, PI, MU, A, D):
-    comp_LLs = get_per_components_log_likelihood_diag(X, PI, MU, A, D)
+def get_max_posterior_component(X, PI, MU, A, D):
+    comp_LLs = get_per_components_log_likelihood(X, PI, MU, A, D)
     return tf.argmax(comp_LLs, axis=0)
 
 
@@ -146,7 +147,7 @@ def generate_from_posterior(X, PI_logits, MU, A, sqrt_D):
     K, d, l = A.get_shape().as_list()
 
     # Find the most probable components for each sample
-    c_i = tf.reshape(get_max_posterior_component_diag(X, PI_logits, MU, A, sqrt_D), [-1])
+    c_i = tf.reshape(get_max_posterior_component(X, PI_logits, MU, A, sqrt_D), [-1])
 
     # Calculate the posterior mean z values and use them to generate samples from the model
     z_mu_i = get_latent_posterior_mean(X, c_i, MU, A, sqrt_D)
