@@ -49,7 +49,8 @@ def main(argv):
     # Hierarchic training...
     if args.samples_per_sub_component > 0:
         print('Now splitting each root component to sub-components...')
-        split_data_by_model_components(gmm_model, output_folder, image_provider, image_shape, batch_size)
+        if not os.path.isdir(os.path.join(output_folder, 'component_lists')):
+            split_data_by_model_components(gmm_model, output_folder, image_provider, image_shape, batch_size)
 
         for comp_num in range(args.num_components):
             list_file = os.path.join(output_folder, 'component_lists', 'comp_{}.txt'.format(comp_num))
@@ -74,10 +75,18 @@ def main(argv):
                     comp_gmm.save(os.path.join(comp_out_folder, 'final_gmm.pkl'))
                 else:
                     print('Training {} sub-components for root component {}...'.format(num_sub_comps, comp_num))
-                    mfa_sgd_training.train(num_components=num_sub_comps, latent_dimension=args.latent_dimension,
-                             out_folder=comp_out_folder, image_shape=image_shape, init_method='km',
-                             image_provider=comp_image_provider, batch_size=batch_size, test_size=comp_image_provider.num_test_images,
-                             learning_rate=5e-5, max_iters=5000)
+                    for tries in range(3):
+                        try:
+                            mfa_sgd_training.train(num_components=num_sub_comps, latent_dimension=args.latent_dimension,
+                                     out_folder=comp_out_folder, image_shape=image_shape, init_method='km',
+                                     image_provider=comp_image_provider, batch_size=batch_size, test_size=comp_image_provider.num_test_images,
+                                     learning_rate=5e-5, max_iters=5000)
+                        except:
+                            print('An error occured.')
+                        else:
+                            break
+                    else:
+                        print('Training of component {} failed!!!'.format(comp_num))
 
         print('Creating the final flat model...')
         flatten_hierarchic_model(gmm_model, output_folder)
