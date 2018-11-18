@@ -85,4 +85,24 @@ Random samples from the mixture:
 
 The test log-likelihood progress:
 
+## The MFA Implementation
+
+`mfa_train_celeba.py` is a script that runs the training process.
+
+The `utils` directory contains the interesting stuff:
+- `mfa.py` is a python class implementing the CPU version of MFA (inference-only - no training)
+- `mfa_tf.py` contains TensorFlow implementation of relevant MFA functionality, for example:
+    - `get_log_likelihood()`: calculates the log-likelihood of a batch of samples given the MFA model parameters.
+- The actual training code in TensorFlow is in `mfa_sgd_training.py`. The two most important lines are:
+```
+    G_loss = -1.0 * mfa_tf.get_log_likelihood(X, *theta_G)
+    G_solver = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(G_loss, var_list=theta_G)
+```
+
+
+## Training MFA on your own dataset
+
+Most of the MFA code should be generic enough to support different datasets. Each data sample is flattened and represented as a (row) vector of floats. The interface to specific datasets is `image_batch_provider.py`. The current implementation supports CelebA, MNIST and SVHN. There are two options to support other datasets:
+1. Modify `image_batch_provider.py`: A small dataset can be preloaded like MNIST. Large datasets should be treated like CelebA, where only an image list is preloaded.
+2. Implement your own version of a data provider, exposing a similar API to `image_batch_provider.py` (i.e. `m_train_images, num_test_images, get_next_minibatch_samples(), get_test_samples(test_size)`
 
