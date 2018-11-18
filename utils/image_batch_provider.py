@@ -65,7 +65,7 @@ class ImageBatchProvider:
         print('Starting image batch provider for {} - {}/{} (train/test) images.'.format(self.image_folder,
                                                                                          self.num_train_images,
                                                                                          self.num_test_images))
-        assert self.num_train_images >= self.batch_size
+        # assert self.num_train_images >= self.batch_size
         self._shuffle()
 
     def _load_images_from_mat(self, mat_file, train_test_str):
