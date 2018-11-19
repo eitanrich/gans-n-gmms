@@ -72,7 +72,7 @@ def main(argv):
                     print('No sub-components for component number {}.'.format(comp_num))
                     comp_gmm = mfa.MFA({0: gmm_model.components[comp_num]})
                     comp_gmm.components[0]['pi'] = 1.0
-                    comp_gmm.save(os.path.join(comp_out_folder, 'final_gmm.pkl'))
+                    comp_gmm.save(os.path.join(comp_out_folder, 'final_gmm'))
                 else:
                     print('Training {} sub-components for root component {}...'.format(num_sub_comps, comp_num))
                     for tries in range(3):
