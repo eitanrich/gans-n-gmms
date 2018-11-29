@@ -174,6 +174,7 @@ class NDB:
         k = self.bin_centers.shape[0]
         D = np.zeros([n, k], dtype=samples.dtype)
 
+        print('Calculating bin assignments for {} samples...'.format(n))
         whitened_samples = (samples-self.training_mean)/self.training_std
         for i in range(k):
             print('.', end='', flush=True)

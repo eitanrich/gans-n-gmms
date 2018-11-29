@@ -294,11 +294,9 @@ class MFA:
             pickle.dump(self.components, f, pickle.HIGHEST_PROTOCOL)
 
     def load(self, file_name):
-        with open(file_name+'.pkl', 'rb') as f:
+        full_name = file_name if file_name.endswith('.pkl') else file_name+'.pkl'
+        with open(full_name, 'rb') as f:
             self.components = pickle.load(f)
-        # Backwards compatibility...
-        for k in self.components.keys():
-            self.components[k]['mu'] = np.array(self.components[k]['mu'])
 
 
 if __name__ == "__main__":

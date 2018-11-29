@@ -39,13 +39,21 @@ def images_to_mosaic(samples, rows=9, cols=16):
     return mosaic
 
 
+def to_image_8u(samples, w, h):
+    return (to_image(samples, w, h)*255.99).astype(np.uint8)
+
+
+def to_images_8u(samples, w, h):
+    return (to_images(samples, w, h)*255.99).astype(np.uint8)
+
+
 def to_cv_image(sample, w, h):
-    img = (to_image(sample, w, h)*255.0).astype(np.uint8)
+    img = to_image_8u(sample, w, h)
     return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 
 def to_cv_images(sample, w, h):
-    img = (to_images(sample, w, h)*255.0).astype(np.uint8)
+    img = to_images_8u(sample, w, h)
     for i in range(img.shape[0]):
         img[i] = cv2.cvtColor(img[i], cv2.COLOR_RGB2BGR)
     return img
