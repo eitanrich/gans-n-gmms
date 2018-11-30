@@ -63,7 +63,7 @@ def kmeans_clustering(samples, num_clusters, get_centers=False):
     N, d = samples.shape
     K = num_clusters
     # Select random d_used coordinates out of d
-    d_used = min(d, max(200, d//8))
+    d_used = min(d, max(500, d//8))
     d_indices = np.random.choice(d, d_used, replace=False)
     print('Performing k-means clustering to {} components of {} samples in dimension {}/{} ...'.format(K, N, d_used, d))
     with Timer('K-means'):

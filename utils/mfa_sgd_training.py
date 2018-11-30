@@ -47,6 +47,8 @@ def train(num_components, latent_dimension, init_method='km',
         print('Initial guess...')
         if init_whiten:
             _, init_std = mfa_utils.get_dataset_mean_and_std(image_provider)
+        else:
+            init_std = 1.0
         init_samples_per_comp = 300
         init_n = min(image_provider.num_train_images, max(num_components * init_samples_per_comp, 10000))
         print('Collecting an initial sample of', init_n, 'samples...')
@@ -94,9 +96,11 @@ def train(num_components, latent_dimension, init_method='km',
 
     print('Starting Mixture of Factor Analyzers ML SGD Training ({} iterations)...'.format(max_iters))
     test_step = 100
-    all_ll = {}
-
+    all_test_ll = {}
+    all_train_ll = {}
     for it in range(max_iters):
+
+        mb_samples = next(training_batch_generator)
 
         # Visualize and save current model
         if (it % (test_step*5) == 0) or it == (max_iters-1):
@@ -113,35 +117,44 @@ def train(num_components, latent_dimension, init_method='km',
 
         # Calculate test-set log-likelihood
         if it % test_step == 0 and test_size > 0:
-            log_likelihood = 0
+            test_ll = 0
             for test_idx in range(0, test_size, batch_size):
                 print('x', end='', flush=True)
                 c_loss, c_D = sess.run([G_loss, G_D],
                                        feed_dict={X: test_set[test_idx:min(test_idx+batch_size, test_size)]})
-                log_likelihood -= c_loss
-            log_likelihood /= test_size
+                test_ll -= c_loss
+            test_ll /= test_size
+
+            if it == 0:
+                train_ll = -1.0/batch_size * sess.run(G_loss, feed_dict={X: mb_samples})
+            else:
+                train_ll = -1.0/batch_size * curr_loss
+
             mean_noise_variance = np.mean(np.power(c_D, 2.0))
-            print('\nIteration ', it, ': LL =', log_likelihood, ', Mean noise variance =', mean_noise_variance)
-            all_ll[it] = log_likelihood
+            print('\nIteration {}: LL = {}, Test LL = {}, Mean noise std = {}'.format(it, train_ll, test_ll, mean_noise_variance))
+
+            all_train_ll[it] = train_ll
+            all_test_ll[it] = test_ll
             # Plot training progress
             plt.figure(4)
             plt.clf()
-            iters = sorted(list(all_ll.keys()))
-            plt.plot(iters, [all_ll[it] for it in iters], '-*')
+            iters = sorted(list(all_test_ll.keys()))
+            plt.plot(iters, [all_train_ll[it] for it in iters], '-.', label='Train')
+            plt.plot(iters, [all_test_ll[it] for it in iters], '-*', label='Test')
             plt.grid(True)
-            plt.title('MFA Test Log-Likelihood')
+            plt.legend()
+            plt.title('MFA Log-Likelihood')
             plt.pause(0.1)
             if out_folder:
-                log_file.write('{},{},{}\n'.format(it, log_likelihood, mean_noise_variance))
+                log_file.write('{},{},{},{}\n'.format(it, train_ll, test_ll, mean_noise_variance))
                 log_file.flush()
 
         # Run an SGD iteration
-        mb_samples = next(training_batch_generator)
         _, curr_loss = sess.run([G_solver, G_loss], feed_dict={X: mb_samples})
 
     print('MFA Training ended.')
     est_gmm.save(os.path.join(out_folder, 'final_gmm'))
     log_file.close()
     plt.figure(4)
-    plt.savefig(os.path.join(out_folder, 'test-ll-graph.pdf'))
+    plt.savefig(os.path.join(out_folder, 'train-test-ll-graph.pdf'))
     return est_gmm

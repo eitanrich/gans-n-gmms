@@ -49,7 +49,7 @@ def main(argv):
     # Now generate images for evaluation
     print('Generating {} random images for evaluation...'.format(num_test))
     samples = gmm_model.draw_samples(num_test, add_noise=False)
-    output_dir = os.path.join(model_dir, 'final_root_generated')
+    output_dir = os.path.join(model_dir, 'final_flat_model')
     os.makedirs(output_dir, exist_ok=True)
     for i in range(num_test):
         image = mfa_utils.to_image_8u(samples[i], image_shape[0], image_shape[1])
