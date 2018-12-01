@@ -49,7 +49,7 @@ def main(argv):
     # Now generate images for evaluation
     print('Generating {} random images for evaluation...'.format(num_test))
     samples = gmm_model.draw_samples(num_test, add_noise=False)
-    output_dir = os.path.join(model_dir, 'final_flat_model')
+    output_dir = os.path.join(model_dir, 'final_flat_generated')
     os.makedirs(output_dir, exist_ok=True)
     for i in range(num_test):
         image = mfa_utils.to_image_8u(samples[i], image_shape[0], image_shape[1])
@@ -66,6 +66,9 @@ def main(argv):
     train_samples = image_provider.get_random_samples(num_train)
     os.makedirs(args.ndb_dir, exist_ok=True)
 
+    images_folder = os.path.join(model_dir, 'final_flat_generated')
+    mfa_provider = image_batch_provider.ImageBatchProvider(images_folder, flatten=True, mirror=False, test_set_ratio=0)
+
     for num_bins in(100, 200, 300):
         print('Performing NDB evaluation for K={}'.format(num_bins))
 
@@ -73,8 +76,6 @@ def main(argv):
         celeba_ndb = ndb.NDB(training_data=train_samples, number_of_bins=num_bins, whitening=True, cache_folder=args.ndb_dir)
 
         # Evaluating MFA samples
-        images_folder = os.path.join(model_dir, 'final_flat_generated')
-        mfa_provider = image_batch_provider.ImageBatchProvider(images_folder, flatten=True, test_set_ratio=0)
         celeba_ndb.evaluate(mfa_provider.get_random_samples(num_test), model_label=model_name)
 
 

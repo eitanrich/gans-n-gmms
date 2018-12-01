@@ -38,7 +38,7 @@ def main(argv):
                                        test_size=batch_size*20, learning_rate=2e-5, max_iters=6000)
 
     print('Done')
-    plt.show()
+    # plt.show()
 
 if __name__ == "__main__":
     main(sys.argv)

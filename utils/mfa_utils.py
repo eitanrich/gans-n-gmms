@@ -36,26 +36,29 @@ def images_to_mosaic(samples, rows=9, cols=16):
             if i*cols+j < n:
                 mosaic[i*h:(i+1)*h, (j*w):(j+1)*w, :] = samples[i*cols+j, ...]
                 # plt.text((j*w), i*h+h//2, str(i*cols+j), color='r', fontsize=16)
-    return mosaic
+    return mosaic.squeeze()
 
 
-def to_image_8u(samples, w, h):
-    return (to_image(samples, w, h)*255.99).astype(np.uint8)
+def to_image_8u(samples, w, h, ch=3):
+    return (to_image(samples, w, h, ch)*255.99).astype(np.uint8)
 
 
-def to_images_8u(samples, w, h):
-    return (to_images(samples, w, h)*255.99).astype(np.uint8)
+def to_images_8u(samples, w, h, ch=3):
+    return (to_images(samples, w, h, ch)*255.99).astype(np.uint8)
 
 
-def to_cv_image(sample, w, h):
-    img = to_image_8u(sample, w, h)
-    return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+def to_cv_image(sample, w, h, ch=3):
+    img = to_image_8u(sample, w, h, ch)
+    if ch==3:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    return img
 
 
-def to_cv_images(sample, w, h):
-    img = to_images_8u(sample, w, h)
-    for i in range(img.shape[0]):
-        img[i] = cv2.cvtColor(img[i], cv2.COLOR_RGB2BGR)
+def to_cv_images(sample, w, h, ch=3):
+    img = to_images_8u(sample, w, h, ch)
+    if ch == 3:
+        for i in range(img.shape[0]):
+            img[i] = cv2.cvtColor(img[i], cv2.COLOR_RGB2BGR)
     return img
 
 
