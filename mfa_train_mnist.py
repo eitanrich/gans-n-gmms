@@ -18,12 +18,12 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_dir', default='../../Datasets/MNIST')
     parser.add_argument('--output_dir', help='Parent directory for storing all trained models', default='./restuls')
-    parser.add_argument('--num_components', help='Number of (root level) mixture components', default=100)
-    parser.add_argument('--latent_dimension', help='Dimension of input factors z', default=4)
+    parser.add_argument('--num_components', help='Number of (root level) mixture components', default=150)
+    parser.add_argument('--latent_dimension', help='Dimension of input factors z', default=5)
     args = parser.parse_args()
 
     image_shape = (28, 28, 1)
-    batch_size = 256
+    batch_size = 512
     image_provider = image_batch_provider.ImageBatchProvider(args.dataset_dir,
                                                              flatten=True,
                                                              batch_size=batch_size,
@@ -35,7 +35,7 @@ def main(argv):
     mfa_sgd_training.train(num_components=args.num_components, latent_dimension=args.latent_dimension,
                                        out_folder=output_folder, image_shape=image_shape, init_method='km',
                                        init_whiten=False, image_provider=image_provider, batch_size=batch_size,
-                                       test_size=batch_size*20, learning_rate=2e-5, max_iters=10000)
+                                       test_size=batch_size*20, learning_rate=2e-5, max_iters=6000)
 
     print('Done')
     plt.show()
