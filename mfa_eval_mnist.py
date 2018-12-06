@@ -12,10 +12,10 @@ from matplotlib import pyplot as plt
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from utils import image_batch_provider
-from utils import mfa_sgd_training
 import mfa_utils
 import mfa
 import ndb
+
 
 def main(argv):
     parser = argparse.ArgumentParser()
