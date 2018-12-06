@@ -68,12 +68,11 @@ def main(argv):
     val_labels = train_val_labels[rand_order[n_train:]]
 
     print('Initialize NDB bins with training samples')
-    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, z_threshold=3, whitening=False)
-                    # bins_file='mnist_{}.pkl'.format(args.num_bins))
+    mnist_ndb = NDB(training_data=train_samples, number_of_bins=args.num_bins, z_threshold=4, whitening=False,
+                    cache_folder='./restuls/mnist_toy_example_ndb_cache')
 
     print('Evaluating {} validation samples (randomly split from the train samples - should be very similar)'.format(n_query))
     mnist_ndb.evaluate(sample_from(val_samples, n_query), 'Validation')
-
 
     print('Simulate a deviation from the data distribution (mode collapse) by sampling from specific labels (digits)')
     biased_samples = sample_from(val_samples[val_labels < 9, :], n_query)

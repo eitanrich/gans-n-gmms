@@ -43,6 +43,7 @@ class NDB:
         if training_data is not None or cache_folder is not None:
                 bins_file = None
                 if cache_folder:
+                    os.makedirs(cache_folder, exist_ok=True)
                     bins_file = os.path.join(cache_folder, self.test_name+'.pkl')
                 self.construct_bins(training_data, bins_file)
 
