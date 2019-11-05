@@ -2,8 +2,9 @@ On GANs and GMMs
 ================
 Implementation of *NDB* and *MFA* per NeurIPS 2018 paper [On GANs and GMMs](https://arxiv.org/abs/1805.12462) by Eitan Richardson and Yair Weiss.
 
-**NDB**: An evaluation method for high-dimensional generative models
+*Check out our new pytorch implementation [here](https://github.com/eitanrich/torch-mfa).*
 
+**NDB**: An evaluation method for high-dimensional generative models  
 **MFA**: Mixture of Factor Analyzers for modeling high-dimensional data (e.g. full images)
 
 ### TODO:
